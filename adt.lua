@@ -311,7 +311,8 @@ itemsSection:Button({
             Flashlight = true,
             Glassbottle = true,
             Barrel = true,
-            Brick = true
+            Brick = true,
+            Heater = true
         }
 
         for _, obj in ipairs(workspace:GetChildren()) do
@@ -444,7 +445,8 @@ itemsSection:Button({
             Food = true,
             Onion = true,
             Peper = true,
-            banana = true
+            banana = true,
+            Donut = true
         }
 
         for _, obj in ipairs(workspace:GetChildren()) do
