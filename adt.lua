@@ -374,69 +374,88 @@ loadingSection:Toggle({
             updateRoadsCache()
 
             autoLoadThread = coroutine.create(function()
-                local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-                local hrp = character:WaitForChild("HumanoidRootPart")
-                if not hrp then
-                    warn("HumanoidRootPart не найден")
-                    autoLoadEnabled = false
-                    return
-                end
-
-                local lastCacheUpdate = os.clock()
-                local lastMaxNumber = -math.huge
-                local teleportedToEnd = false
-
-                while autoLoadEnabled do
-                    -- Телепортируем к End один раз
-                    if not teleportedToEnd then
-                        if teleportToRoadEnd(hrp) then
-                            print("Телепортирован к RoadPrefabs.Canyon.Road.End")
-                            teleportedToEnd = true
-                            task.wait(1) -- пауза после телепорта
-                        end
-                    end
-
-                    -- Обновляем кеш раз в секунду
-                    if os.clock() - lastCacheUpdate > cacheUpdateInterval then
-                        updateRoadsCache()
-                        lastCacheUpdate = os.clock()
-                    end
-
-                    -- Телепортируемся к самой большой дороге (с максимальным номером)
-                    local maxEntry = cachedRoads[#cachedRoads]
-                    if maxEntry and maxEntry.num > lastMaxNumber then
-                        local targetModel = maxEntry.model
-                        local targetPart = targetModel.PrimaryPart
-                        if not targetPart then
-                            for _, part in ipairs(targetModel:GetChildren()) do
-                                if part:IsA("BasePart") then
-                                    targetPart = part
-                                    break
-                                end
-                            end
-                        end
-
-                        if targetPart then
-                            local targetCFrame = targetPart.CFrame + Vector3.new(0, 5, 0)
-                            if teleportToCFrame(hrp, targetCFrame) then
-                                print("Телепортирован к дороге с номером:", maxEntry.num)
-                                lastMaxNumber = maxEntry.num
-                                task.wait(1) -- пауза после телепорта
-                            end
-                        else
-                            warn("В модели нет частей для телепортации")
-                        end
-                    end
-
-                    task.wait(autoLoadInterval)
-                end
-            end)
-
-            coroutine.resume(autoLoadThread)
-        else
-            -- Останавливаем корутину
-            autoLoadEnabled = false
-            autoLoadThread = nil
-        end
+    local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    local hrp = character:FindFirstChild("HumanoidRootPart")
+    if not hrp then
+        warn("HumanoidRootPart не найден")
+        autoLoadEnabled = false
+        return
     end
-})
+
+    local lastCacheUpdate = os.clock()
+    local lastMaxNumber = -math.huge
+    local teleportedToEnd = false
+
+    while autoLoadEnabled do
+        -- Проверяем наличие End дороги
+        local endPart = workspace:FindFirstChild("RoadPrefabs") 
+                        and workspace.RoadPrefabs:FindFirstChild("Canyon") 
+                        and workspace.RoadPrefabs.Canyon:FindFirstChild("Road") 
+                        and workspace.RoadPrefabs.Canyon.Road:FindFirstChild("End")
+
+        if not teleportedToEnd then
+            if endPart and endPart:IsA("BasePart") then
+                hrp.CFrame = endPart.CFrame + Vector3.new(0, 5, 0)
+                print("Телепортирован к RoadPrefabs.Canyon.Road.End")
+            else
+                -- Если End нет, телепортируемся сразу к дороге с самым большим номером
+                local maxEntry = cachedRoads[#cachedRoads]
+                if maxEntry then
+                    local targetModel = maxEntry.model
+                    local targetPart = targetModel.PrimaryPart
+                    if not targetPart then
+                        for _, part in ipairs(targetModel:GetChildren()) do
+                            if part:IsA("BasePart") then
+                                targetPart = part
+                                break
+                            end
+                        end
+                    end
+                    if targetPart then
+                        hrp.CFrame = targetPart.CFrame + Vector3.new(0, 5, 0)
+                        print("Телепортирован к дороге с самым большим номером: " .. tostring(maxEntry.num))
+                        lastMaxNumber = maxEntry.num
+                    else
+                        warn("В модели нет частей для телепортации")
+                    end
+                else
+                    warn("Кеш дорог пустой")
+                end
+            end
+            teleportedToEnd = true
+            task.wait(1) -- чтобы успел телепортироваться
+        end
+
+        -- Обновляем кеш периодически
+        if os.clock() - lastCacheUpdate > cacheUpdateInterval then
+            updateRoadsCache()
+            lastCacheUpdate = os.clock()
+        end
+
+        -- Если End есть, и мы уже телепортировались к End, продолжаем телепортироваться по дорогам с увеличением номера
+        if teleportedToEnd and endPart then
+            local maxEntry = cachedRoads[#cachedRoads]
+            if maxEntry and maxEntry.num > lastMaxNumber then
+                local targetModel = maxEntry.model
+                local targetPart = targetModel.PrimaryPart
+                if not targetPart then
+                    for _, part in ipairs(targetModel:GetChildren()) do
+                        if part:IsA("BasePart") then
+                            targetPart = part
+                            break
+                        end
+                    end
+                end
+                if targetPart then
+                    hrp.CFrame = targetPart.CFrame + Vector3.new(0, 5, 0)
+                    print("Телепортирован к дороге с номером: " .. tostring(maxEntry.num))
+                    lastMaxNumber = maxEntry.num
+                else
+                    warn("В модели нет частей для телепортации")
+                end
+            end
+        end
+
+        task.wait(autoLoadInterval)
+    end
+end)
