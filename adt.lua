@@ -4,39 +4,19 @@ local Flags = Library.Flags
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local Workspace = game:GetService("Workspace")
-local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
-
 local trackedESP = {}
 local billboardGUIs = {}
 local espConn
-
 local goodshopPosition = nil
 local autoCheckEnabled = true
 
-local autoLoadEnabled = false
-local autoLoadThread = nil
-local autoLoadInterval = 1 -- сек между перемещениями
-
-local roadsFolder = nil
-local cachedRoads = {}
-local cacheUpdateInterval = 1
-
--- Функция проверки близости по позиции (чтобы не делать твины если уже рядом)
-local function isClose(cframe1, cframe2, tolerance)
-    tolerance = tolerance or 1
-    return (cframe1.Position - cframe2.Position).Magnitude <= tolerance
+-- Функция сравнения позиций с порогом
+local function isClose(cframe1, cframe2, threshold)
+    threshold = threshold or 0.5
+    return (cframe1.Position - cframe2.Position).Magnitude <= threshold
 end
 
--- Функция плавного перемещения
-local function tweenToPosition(hrp, targetCFrame, duration)
-    local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear)
-    local tween = TweenService:Create(hrp, tweenInfo, {CFrame = targetCFrame})
-    tween:Play()
-    return tween
-end
-
--- Обновляем позицию выгодного магазина
 local function updateGoodshopPosition()
     local modelspoint = workspace:FindFirstChild("modelspoint")
     if not modelspoint then
@@ -77,7 +57,6 @@ local function updateGoodshopPosition()
     end
 end
 
--- Корутина для постоянного обновления позиции выгодного магазина
 coroutine.wrap(function()
     while autoCheckEnabled do
         updateGoodshopPosition()
@@ -89,32 +68,26 @@ local Window = Library:Window({
    Text = "ADT"
 })
 
--- Табы
-local teleportTab = Window:Tab({Text = "Телепорты"})
-local itemsTab = Window:Tab({Text = "Предметы"})
-local visualTab = Window:Tab({Text = "Визуалы"})
-local miscTab = Window:Tab({Text = "Разное"})
-local autoFarmTab = Window:Tab({Text = "Авто-Фарм"})
+-- ТАБЫ
+local teleportTab = Window:Tab({ Text = "Телепорты" })
+local itemsTab = Window:Tab({ Text = "Предметы" })
+local visualTab = Window:Tab({ Text = "Визуалы" })
+local miscTab = Window:Tab({ Text = "Разное" })
 
--- Секции
-local shopSection = teleportTab:Section({Text = "Магазины"})
-local itemsSection = itemsTab:Section({Text = "Телепорт Предметов"})
-local itemsESPSection = visualTab:Section({Text = "Подсветка"})
-local miscSection = miscTab:Section({Text = "Плейс"})
-local loadingSection = autoFarmTab:Section({Text = "Прогрузка"})
+-- СЕКЦИИ
+local shopSection = teleportTab:Section({ Text = "Магазины" })
+local itemsSection = itemsTab:Section({ Text = "Телепорт Предметов" })
+local itemsESPSection = visualTab:Section({ Text = "Подсветка" })
+local miscSection = miscTab:Section({ Text = "Плейс" })
 
--- ESP Toggle
+-- ESP Крышечки
 itemsESPSection:Toggle({
     Text = "Крышечки",
     Flag = "bottleCapESP",
     Callback = function(state)
-        -- Очистка предыдущих ESP и GUI
-        for _, v in ipairs(trackedESP) do
-            if v then v:Destroy() end
-        end
-        for _, v in ipairs(billboardGUIs) do
-            if v then v:Destroy() end
-        end
+        -- Удаление старых ESP и GUI
+        for _, v in ipairs(trackedESP) do if v then v:Destroy() end end
+        for _, v in ipairs(billboardGUIs) do if v then v:Destroy() end end
         table.clear(trackedESP)
         table.clear(billboardGUIs)
 
@@ -172,14 +145,14 @@ itemsESPSection:Toggle({
             table.insert(billboardGUIs, billboard)
         end
 
-        -- Обрабатываем уже существующие модели
+        -- Уже существующие объекты
         for _, obj in ipairs(workspace:GetDescendants()) do
             if obj:IsA("Model") and (obj.Name == "BottleCap" or obj.Name == "5Pile" or obj.Name == "15Pile") then
                 createESP(obj)
             end
         end
 
-        -- Обработка новых моделей
+        -- Новые объекты
         espConn = workspace.DescendantAdded:Connect(function(desc)
             if desc:IsA("Model") and (desc.Name == "BottleCap" or desc.Name == "5Pile" or desc.Name == "15Pile") then
                 task.wait(0.1)
@@ -189,19 +162,18 @@ itemsESPSection:Toggle({
     end
 })
 
--- Кнопка перезахода
+-- Кнопка Перезайти
 miscSection:Button({
     Text = "Перезайти",
     Callback = function()
         local TeleportService = game:GetService("TeleportService")
         local PlaceId = game.PlaceId
         local Player = game.Players.LocalPlayer
-
         TeleportService:Teleport(PlaceId, Player)
     end
 })
 
--- Телепорт крышечек
+-- Телепорт Крышечек
 itemsSection:Button({
     Text = "Крышечки",
     Callback = function()
@@ -238,7 +210,7 @@ itemsSection:Button({
     end
 })
 
--- Телепорт ценных вещей
+-- Телепорт Ценных Вещей
 itemsSection:Button({
     Text = "Ценные вещи",
     Callback = function()
@@ -267,43 +239,88 @@ itemsSection:Button({
             Shield = true,
             vaz = true,
             vaza = true,
-            GreenBox = true,
-            CopperOre = true,
-            MysteriousBox = true,
-            Fan = true,
+            toilet = true
         }
 
-        local function findAndTeleportValuables(parent)
-            for _, child in ipairs(parent:GetChildren()) do
-                if targetNames[child.Name] then
-                    teleportObject(child)
-                end
-                findAndTeleportValuables(child)
+        for _, obj in ipairs(workspace:GetChildren()) do
+            if targetNames[obj.Name] then
+                teleportObject(obj)
             end
         end
-
-        findAndTeleportValuables(game)
     end
 })
 
--- Автопрогрузка
+-- Кнопка Переработка
+shopSection:Button({
+    Text = "Переработка",
+    Callback = function()
+        local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+        local hrp = character:FindFirstChild("HumanoidRootPart")
+        local scrapRecycler = workspace:FindFirstChild("RoadPrefabs") and workspace.RoadPrefabs:FindFirstChild("ScrapRecycler")
 
--- Обновляем кеш дорог
+        if hrp and scrapRecycler then
+            local targetPart = scrapRecycler.PrimaryPart
+
+            if not targetPart then
+                for _, part in ipairs(scrapRecycler:GetChildren()) do
+                    if part:IsA("BasePart") then
+                        targetPart = part
+                        break
+                    end
+                end
+            end
+
+            if targetPart then
+                hrp.CFrame = targetPart.CFrame + Vector3.new(0, 5, 0)
+            else
+                warn("В ScrapRecycler нет частей (BasePart) для телепортации")
+            end
+        else
+            warn("Не найден ScrapRecycler или HumanoidRootPart")
+        end
+    end
+})
+
+-- Кнопка Выгодный магазин
+shopSection:Button({
+    Text = "Выгодный магазин",
+    Callback = function()
+        if goodshopPosition then
+            local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+            local hrp = character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                hrp.CFrame = goodshopPosition
+                print("Телепортирован к последней позиции Выгодного магазина")
+            else
+                warn("HumanoidRootPart не найден")
+            end
+        else
+            warn("Позиция Выгодного магазина еще не найдена")
+        end
+    end
+})
+
+-- Новый таб Авто-Фарм
+local autoFarmTab = Window:Tab({ Text = "Авто-Фарм" })
+local loadingSection = autoFarmTab:Section({ Text = "Прогрузка" })
+
+local autoLoadEnabled = false
+local autoLoadThread = nil
+local autoLoadInterval = 1 -- секунд между телепортами
+
+local roadsFolder = nil
+local cachedRoads = {}
+local cacheUpdateInterval = 1 -- обновлять кеш раз в 1 секунду
+
 local function updateRoadsCache()
     cachedRoads = {}
+    if not roadsFolder then return end
 
-    roadsFolder = workspace:FindFirstChild("RoadPrefabs") and workspace.RoadPrefabs:FindFirstChild("Canyon") and workspace.RoadPrefabs.Canyon:FindFirstChild("Road")
-
-    if not roadsFolder then
-        warn("Папка дорог не найдена")
-        return
-    end
-
-    for _, roadModel in ipairs(roadsFolder:GetChildren()) do
-        if roadModel:IsA("Model") then
-            local numValue = roadModel:FindFirstChild("num")
-            if numValue and numValue:IsA("IntValue") then
-                table.insert(cachedRoads, {num = numValue.Value, model = roadModel})
+    for _, model in ipairs(roadsFolder:GetChildren()) do
+        if model:IsA("Model") then
+            local num = tonumber(model.Name)
+            if num then
+                table.insert(cachedRoads, { num = num, model = model })
             end
         end
     end
@@ -313,107 +330,113 @@ local function updateRoadsCache()
     end)
 end
 
--- Функция запуска автопрогрузки
-local function startAutoLoad()
-    if autoLoadThread and coroutine.status(autoLoadThread) == "running" then
-        return -- Уже работает
-    end
-
-    autoLoadEnabled = true
-
-    autoLoadThread = coroutine.create(function()
-        local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-        local hrp = character:WaitForChild("HumanoidRootPart")
-
-        if not hrp then
-            warn("HumanoidRootPart не найден")
-            autoLoadEnabled = false
-            return
-        end
-
-        local lastCacheUpdate = os.clock()
-        local lastMaxNumber = -math.huge
-        local teleportedToEnd = false
-
-        while autoLoadEnabled do
-            if not teleportedToEnd then
-                local endPart = roadsFolder and roadsFolder:FindFirstChild("End")
-                if endPart and endPart:IsA("BasePart") then
-                    local targetCFrame = endPart.CFrame + Vector3.new(0, 5, 0)
-                    if not isClose(hrp.CFrame, targetCFrame) then
-                        local tween = tweenToPosition(hrp, targetCFrame, autoLoadInterval)
-                        tween.Completed:Wait()
-                        print("Плавно переместился к End")
-                    end
-                    teleportedToEnd = true
-                end
-            end
-
-            if os.clock() - lastCacheUpdate > cacheUpdateInterval then
-                updateRoadsCache()
-                lastCacheUpdate = os.clock()
-            end
-
-            local maxEntry = cachedRoads[#cachedRoads]
-            if maxEntry and maxEntry.num > lastMaxNumber then
-                local targetModel = maxEntry.model
-                local targetPart = targetModel.PrimaryPart
-                if not targetPart then
-                    for _, part in ipairs(targetModel:GetChildren()) do
-                        if part:IsA("BasePart") then
-                            targetPart = part
-                            break
-                        end
-                    end
-                end
-
-                if targetPart then
-                    local targetCFrame = targetPart.CFrame + Vector3.new(0, 5, 0)
-                    if not isClose(hrp.CFrame, targetCFrame) then
-                        local tween = tweenToPosition(hrp, targetCFrame, autoLoadInterval)
-                        tween.Completed:Wait()
-                        print("Плавно переместился к дороге №" .. tostring(maxEntry.num))
-                        lastMaxNumber = maxEntry.num
-                    end
-                else
-                    warn("В модели нет частей для телепортации")
-                end
-            end
-
-            task.wait(autoLoadInterval)
-        end
-    end)
-
-    coroutine.resume(autoLoadThread)
+local function isClose(cframe1, cframe2, threshold)
+    threshold = threshold or 0.5
+    return (cframe1.Position - cframe2.Position).Magnitude <= threshold
 end
 
--- Остановка автопрогрузки
-local function stopAutoLoad()
-    autoLoadEnabled = false
+local function teleportToCFrame(hrp, targetCFrame)
+    if not isClose(hrp.CFrame, targetCFrame) then
+        hrp.CFrame = targetCFrame
+        return true
+    end
+    return false
+end
+
+local function teleportToRoadEnd(hrp)
+    local endPart = workspace:FindFirstChild("RoadPrefabs") 
+                    and workspace.RoadPrefabs:FindFirstChild("Canyon") 
+                    and workspace.RoadPrefabs.Canyon:FindFirstChild("Road") 
+                    and workspace.RoadPrefabs.Canyon.Road:FindFirstChild("End")
+    if endPart and endPart:IsA("BasePart") then
+        local targetCFrame = endPart.CFrame + Vector3.new(0, 5, 0)
+        return teleportToCFrame(hrp, targetCFrame)
+    end
+    return false
 end
 
 loadingSection:Toggle({
-    Text = "Авто-прогрузка",
+    Text = "Авто-прогрузка дорог",
     Flag = "autoLoadToggle",
     Callback = function(state)
+        autoLoadEnabled = state
+
         if state then
-            startAutoLoad()
+            roadsFolder = workspace:FindFirstChild("RoadPrefabs") 
+                            and workspace.RoadPrefabs:FindFirstChild("Canyon") 
+                            and workspace.RoadPrefabs.Canyon:FindFirstChild("Road")
+            if not roadsFolder then
+                warn("Не найдена папка дорог RoadPrefabs.Canyon.Road")
+                autoLoadEnabled = false
+                return
+            end
+
+            updateRoadsCache()
+
+            autoLoadThread = coroutine.create(function()
+                local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+                local hrp = character:WaitForChild("HumanoidRootPart")
+                if not hrp then
+                    warn("HumanoidRootPart не найден")
+                    autoLoadEnabled = false
+                    return
+                end
+
+                local lastCacheUpdate = os.clock()
+                local lastMaxNumber = -math.huge
+                local teleportedToEnd = false
+
+                while autoLoadEnabled do
+                    -- Телепортируем к End один раз
+                    if not teleportedToEnd then
+                        if teleportToRoadEnd(hrp) then
+                            print("Телепортирован к RoadPrefabs.Canyon.Road.End")
+                            teleportedToEnd = true
+                            task.wait(1) -- пауза после телепорта
+                        end
+                    end
+
+                    -- Обновляем кеш раз в секунду
+                    if os.clock() - lastCacheUpdate > cacheUpdateInterval then
+                        updateRoadsCache()
+                        lastCacheUpdate = os.clock()
+                    end
+
+                    -- Телепортируемся к самой большой дороге (с максимальным номером)
+                    local maxEntry = cachedRoads[#cachedRoads]
+                    if maxEntry and maxEntry.num > lastMaxNumber then
+                        local targetModel = maxEntry.model
+                        local targetPart = targetModel.PrimaryPart
+                        if not targetPart then
+                            for _, part in ipairs(targetModel:GetChildren()) do
+                                if part:IsA("BasePart") then
+                                    targetPart = part
+                                    break
+                                end
+                            end
+                        end
+
+                        if targetPart then
+                            local targetCFrame = targetPart.CFrame + Vector3.new(0, 5, 0)
+                            if teleportToCFrame(hrp, targetCFrame) then
+                                print("Телепортирован к дороге с номером:", maxEntry.num)
+                                lastMaxNumber = maxEntry.num
+                                task.wait(1) -- пауза после телепорта
+                            end
+                        else
+                            warn("В модели нет частей для телепортации")
+                        end
+                    end
+
+                    task.wait(autoLoadInterval)
+                end
+            end)
+
+            coroutine.resume(autoLoadThread)
         else
-            stopAutoLoad()
+            -- Останавливаем корутину
+            autoLoadEnabled = false
+            autoLoadThread = nil
         end
     end
 })
-
-loadingSection:Slider({
-    Text = "Интервал перемещения (сек)",
-    Flag = "autoLoadInterval",
-    Min = 0.1,
-    Max = 5,
-    Default = 1,
-    Decimals = 2,
-    Callback = function(value)
-        autoLoadInterval = value
-    end
-})
-
-Library:Init()
