@@ -11,12 +11,6 @@ local espConn
 local goodshopPosition = nil
 local autoCheckEnabled = true
 
--- Функция сравнения позиций с порогом
-local function isClose(cframe1, cframe2, threshold)
-    threshold = threshold or 0.5
-    return (cframe1.Position - cframe2.Position).Magnitude <= threshold
-end
-
 local function updateGoodshopPosition()
     local modelspoint = workspace:FindFirstChild("modelspoint")
     if not modelspoint then
@@ -46,7 +40,7 @@ local function updateGoodshopPosition()
 
                 if targetPart then
                     local newPosition = targetPart.CFrame + Vector3.new(0, 5, 0)
-                    if not goodshopPosition or not isClose(goodshopPosition, newPosition, 0.01) then
+                    if not goodshopPosition or not goodshopPosition.Position:FuzzyEq(newPosition.Position, 0.01) then
                         goodshopPosition = newPosition
                         print("Обновлена позиция Выгодного магазина:", goodshopPosition)
                     end
@@ -69,25 +63,52 @@ local Window = Library:Window({
 })
 
 -- ТАБЫ
-local teleportTab = Window:Tab({ Text = "Телепорты" })
-local itemsTab = Window:Tab({ Text = "Предметы" })
-local visualTab = Window:Tab({ Text = "Визуалы" })
-local miscTab = Window:Tab({ Text = "Разное" })
+
+local teleportTab = Window:Tab({
+    Text = "Телепорты"
+})
+
+local itemsTab = Window:Tab({
+    Text = "Предметы"
+})
+
+local visualTab = Window:Tab({
+    Text = "Визуалы"
+})
+
+local miscTab = Window:Tab({
+    Text = "Разное"
+})
 
 -- СЕКЦИИ
-local shopSection = teleportTab:Section({ Text = "Магазины" })
-local itemsSection = itemsTab:Section({ Text = "Телепорт Предметов" })
-local itemsESPSection = visualTab:Section({ Text = "Подсветка" })
-local miscSection = miscTab:Section({ Text = "Плейс" })
+local shopSection = teleportTab:Section({
+   Text = "Магазины"
+})
 
--- ESP Крышечки
+local itemsSection = itemsTab:Section({
+    Text = "Телепорт Предметов"
+})
+
+local itemsESPSection = visualTab:Section({
+    Text = "Подсветка"
+})
+
+local miscSection = miscTab:Section({
+    Text = "Плейс"
+})
+
+
 itemsESPSection:Toggle({
     Text = "Крышечки",
     Flag = "bottleCapESP",
     Callback = function(state)
         -- Удаление старых ESP и GUI
-        for _, v in ipairs(trackedESP) do if v then v:Destroy() end end
-        for _, v in ipairs(billboardGUIs) do if v then v:Destroy() end end
+        for _, v in ipairs(trackedESP) do
+            if v then v:Destroy() end
+        end
+        for _, v in ipairs(billboardGUIs) do
+            if v then v:Destroy() end
+        end
         table.clear(trackedESP)
         table.clear(billboardGUIs)
 
@@ -145,7 +166,7 @@ itemsESPSection:Toggle({
             table.insert(billboardGUIs, billboard)
         end
 
-        -- Уже существующие объекты
+        -- Пройтись по уже существующим
         for _, obj in ipairs(workspace:GetDescendants()) do
             if obj:IsA("Model") and (obj.Name == "BottleCap" or obj.Name == "5Pile" or obj.Name == "15Pile") then
                 createESP(obj)
@@ -162,21 +183,24 @@ itemsESPSection:Toggle({
     end
 })
 
--- Кнопка Перезайти
 miscSection:Button({
     Text = "Перезайти",
     Callback = function()
         local TeleportService = game:GetService("TeleportService")
         local PlaceId = game.PlaceId
         local Player = game.Players.LocalPlayer
+
         TeleportService:Teleport(PlaceId, Player)
     end
 })
 
--- Телепорт Крышечек
+
 itemsSection:Button({
     Text = "Крышечки",
     Callback = function()
+        local Players = game:GetService("Players")
+        local LocalPlayer = Players.LocalPlayer
+
         local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
         local hrp = character:WaitForChild("HumanoidRootPart")
 
@@ -210,10 +234,12 @@ itemsSection:Button({
     end
 })
 
--- Телепорт Ценных Вещей
 itemsSection:Button({
     Text = "Ценные вещи",
     Callback = function()
+        local Players = game:GetService("Players")
+        local LocalPlayer = Players.LocalPlayer
+
         local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
         local hrp = character:WaitForChild("HumanoidRootPart")
 
@@ -250,7 +276,10 @@ itemsSection:Button({
     end
 })
 
--- Кнопка Переработка
+
+
+
+-- Кнопка "Переработка"
 shopSection:Button({
     Text = "Переработка",
     Callback = function()
@@ -281,7 +310,7 @@ shopSection:Button({
     end
 })
 
--- Кнопка Выгодный магазин
+-- Кнопка "Выгодный магазин"
 shopSection:Button({
     Text = "Выгодный магазин",
     Callback = function()
@@ -300,162 +329,125 @@ shopSection:Button({
     end
 })
 
--- Новый таб Авто-Фарм
-local autoFarmTab = Window:Tab({ Text = "Авто-Фарм" })
-local loadingSection = autoFarmTab:Section({ Text = "Прогрузка" })
+-- Новый таб "Авто-Фарм"
+local autoFarmTab = Window:Tab({
+    Text = "Авто-Фарм"
+})
+
+local loadingSection = autoFarmTab:Section({
+    Text = "Прогрузка"
+})
 
 local autoLoadEnabled = false
 local autoLoadThread = nil
-local autoLoadInterval = 1 -- секунд между телепортами
+local autoLoadInterval = 1 -- значение по умолчанию, секунд между телепортами
 
 local roadsFolder = nil
 local cachedRoads = {}
-local cacheUpdateInterval = 1 -- обновлять кеш раз в 1 секунду
+local cacheUpdateInterval = autoLoadInterval -- обновлять кеш раз в 0.1 секунд
 
 local function updateRoadsCache()
     cachedRoads = {}
     if not roadsFolder then return end
-
-    for _, model in ipairs(roadsFolder:GetChildren()) do
-        if model:IsA("Model") then
-            local num = tonumber(model.Name)
-            if num then
-                table.insert(cachedRoads, { num = num, model = model })
-            end
+    for _, child in ipairs(roadsFolder:GetChildren()) do
+        local num = tonumber(child.Name)
+        if num then
+            table.insert(cachedRoads, {num = num, model = child})
         end
     end
-
-    table.sort(cachedRoads, function(a, b)
-        return a.num < b.num
-    end)
+    table.sort(cachedRoads, function(a,b) return a.num < b.num end)
 end
 
-local function isClose(cframe1, cframe2, threshold)
-    threshold = threshold or 0.5
-    return (cframe1.Position - cframe2.Position).Magnitude <= threshold
-end
-
-local function teleportToCFrame(hrp, targetCFrame)
-    if not isClose(hrp.CFrame, targetCFrame) then
-        hrp.CFrame = targetCFrame
-        return true
+loadingSection:Slider({
+    Text = "Интервал (сек.)",
+    Min = 0.1,
+    Max = 5,
+    Default = autoLoadInterval,
+    Float = 1,
+    Callback = function(value)
+        autoLoadInterval = value
     end
-    return false
-end
-
-local function teleportToRoadEnd(hrp)
-    local endPart = workspace:FindFirstChild("RoadPrefabs") 
-                    and workspace.RoadPrefabs:FindFirstChild("Canyon") 
-                    and workspace.RoadPrefabs.Canyon:FindFirstChild("Road") 
-                    and workspace.RoadPrefabs.Canyon.Road:FindFirstChild("End")
-    if endPart and endPart:IsA("BasePart") then
-        local targetCFrame = endPart.CFrame + Vector3.new(0, 5, 0)
-        return teleportToCFrame(hrp, targetCFrame)
-    end
-    return false
-end
+})
 
 loadingSection:Toggle({
-    Text = "Авто-прогрузка дорог",
-    Flag = "autoLoadToggle",
+    Text = "Авто-Прогрузка",
+    Flag = "AutoLoadToggle",
     Callback = function(state)
         autoLoadEnabled = state
-
-        if state then
-            roadsFolder = workspace:FindFirstChild("RoadPrefabs") 
-                            and workspace.RoadPrefabs:FindFirstChild("Canyon") 
-                            and workspace.RoadPrefabs.Canyon:FindFirstChild("Road")
+        if autoLoadEnabled then
+            roadsFolder = Workspace:FindFirstChild("models")
+            roadsFolder = roadsFolder and roadsFolder:FindFirstChild("roads")
             if not roadsFolder then
-                warn("Не найдена папка дорог RoadPrefabs.Canyon.Road")
+                warn("models.roads не найден")
                 autoLoadEnabled = false
                 return
             end
 
-            updateRoadsCache()
+            updateRoadsCache() -- сразу кешируем
 
             autoLoadThread = coroutine.create(function()
-    local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    local hrp = character:FindFirstChild("HumanoidRootPart")
-    if not hrp then
-        warn("HumanoidRootPart не найден")
-        autoLoadEnabled = false
-        return
-    end
+                local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+                local hrp = character:FindFirstChild("HumanoidRootPart")
+                if not hrp then
+                    warn("HumanoidRootPart не найден")
+                    autoLoadEnabled = false
+                    return
+                end
 
-    local lastCacheUpdate = os.clock()
-    local lastMaxNumber = -math.huge
-    local teleportedToEnd = false
+                local lastCacheUpdate = os.clock()
+                local lastMaxNumber = -math.huge
+                local teleportedToEnd = false
 
-    while autoLoadEnabled do
-        -- Проверяем наличие End дороги
-        local endPart = workspace:FindFirstChild("RoadPrefabs") 
-                        and workspace.RoadPrefabs:FindFirstChild("Canyon") 
-                        and workspace.RoadPrefabs.Canyon:FindFirstChild("Road") 
-                        and workspace.RoadPrefabs.Canyon.Road:FindFirstChild("End")
+                while autoLoadEnabled do
+                    -- Проверяем и телепортируем к End, если еще не телепортировались
+                    if not teleportedToEnd then
+                        local endPart = workspace:FindFirstChild("RoadPrefabs") 
+                                        and workspace.RoadPrefabs:FindFirstChild("Canyon") 
+                                        and workspace.RoadPrefabs.Canyon:FindFirstChild("Road") 
+                                        and workspace.RoadPrefabs.Canyon.Road:FindFirstChild("End")
+                        if endPart and endPart:IsA("BasePart") then
+                            hrp.CFrame = endPart.CFrame + Vector3.new(0, 5, 0)
+                            print("Телепортирован к RoadPrefabs.Canyon.Road.End")
+                            teleportedToEnd = true
+                            task.wait(1) -- пауза, чтобы игрок успел телепортироваться
+                        end
+                    end
 
-        if not teleportedToEnd then
-            if endPart and endPart:IsA("BasePart") then
-                hrp.CFrame = endPart.CFrame + Vector3.new(0, 5, 0)
-                print("Телепортирован к RoadPrefabs.Canyon.Road.End")
-            else
-                -- Если End нет, телепортируемся сразу к дороге с самым большим номером
-                local maxEntry = cachedRoads[#cachedRoads]
-                if maxEntry then
-                    local targetModel = maxEntry.model
-                    local targetPart = targetModel.PrimaryPart
-                    if not targetPart then
-                        for _, part in ipairs(targetModel:GetChildren()) do
-                            if part:IsA("BasePart") then
-                                targetPart = part
-                                break
+                    -- Обновляем кеш каждые cacheUpdateInterval секунд
+                    if os.clock() - lastCacheUpdate > cacheUpdateInterval then
+                        updateRoadsCache()
+                        lastCacheUpdate = os.clock()
+                    end
+
+                    local maxEntry = cachedRoads[#cachedRoads]
+                    if maxEntry and maxEntry.num > lastMaxNumber then
+                        local targetModel = maxEntry.model
+                        local targetPart = targetModel.PrimaryPart
+                        if not targetPart then
+                            for _, part in ipairs(targetModel:GetChildren()) do
+                                if part:IsA("BasePart") then
+                                    targetPart = part
+                                    break
+                                end
                             end
                         end
-                    end
-                    if targetPart then
-                        hrp.CFrame = targetPart.CFrame + Vector3.new(0, 5, 0)
-                        print("Телепортирован к дороге с самым большим номером: " .. tostring(maxEntry.num))
-                        lastMaxNumber = maxEntry.num
-                    else
-                        warn("В модели нет частей для телепортации")
-                    end
-                else
-                    warn("Кеш дорог пустой")
-                end
-            end
-            teleportedToEnd = true
-            task.wait(1) -- чтобы успел телепортироваться
-        end
 
-        -- Обновляем кеш периодически
-        if os.clock() - lastCacheUpdate > cacheUpdateInterval then
-            updateRoadsCache()
-            lastCacheUpdate = os.clock()
-        end
-
-        -- Если End есть, и мы уже телепортировались к End, продолжаем телепортироваться по дорогам с увеличением номера
-        if teleportedToEnd and endPart then
-            local maxEntry = cachedRoads[#cachedRoads]
-            if maxEntry and maxEntry.num > lastMaxNumber then
-                local targetModel = maxEntry.model
-                local targetPart = targetModel.PrimaryPart
-                if not targetPart then
-                    for _, part in ipairs(targetModel:GetChildren()) do
-                        if part:IsA("BasePart") then
-                            targetPart = part
-                            break
+                        if targetPart then
+                            hrp.CFrame = targetPart.CFrame + Vector3.new(0, 5, 0)
+                            print("Телепортирован к дороге с номером: " .. tostring(maxEntry.num))
+                            lastMaxNumber = maxEntry.num
+                        else
+                            warn("В модели нет частей для телепортации")
                         end
                     end
-                end
-                if targetPart then
-                    hrp.CFrame = targetPart.CFrame + Vector3.new(0, 5, 0)
-                    print("Телепортирован к дороге с номером: " .. tostring(maxEntry.num))
-                    lastMaxNumber = maxEntry.num
-                else
-                    warn("В модели нет частей для телепортации")
-                end
-            end
-        end
 
-        task.wait(autoLoadInterval)
+                    task.wait(autoLoadInterval)
+                end
+            end)
+
+            coroutine.resume(autoLoadThread)
+        else
+            autoLoadEnabled = false
+        end
     end
-end)
+})
