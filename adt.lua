@@ -80,7 +80,9 @@ local miscTab = Window:Tab({
     Text = "Разное"
 })
 
+
 -- СЕКЦИИ
+
 local shopSection = teleportTab:Section({
    Text = "Магазины"
 })
@@ -97,6 +99,7 @@ local miscSection = miscTab:Section({
     Text = "Плейс"
 })
 
+-- ТОГГЛЫ
 
 itemsESPSection:Toggle({
     Text = "Крышечки",
@@ -320,6 +323,47 @@ itemsSection:Button({
 })
 
 itemsSection:Button({
+    Text = "Оружие",
+    Callback = function()
+        local Players = game:GetService("Players")
+        local LocalPlayer = Players.LocalPlayer
+
+        local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+        local hrp = character:WaitForChild("HumanoidRootPart")
+
+        local offsetY = 0.5
+        local count = 0
+
+        local function teleportObject(obj)
+            local targetPart
+            if obj:IsA("Model") then
+                targetPart = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
+            elseif obj:IsA("BasePart") then
+                targetPart = obj
+            end
+
+            if targetPart then
+                targetPart.CFrame = hrp.CFrame * CFrame.new(0, offsetY * count, -5)
+                count = count + 1
+            end
+        end
+
+        local targetNames = {
+          ["Gummy Gun"] = true,
+          Pistol = true,
+          AK47 = true
+        }
+
+        for _, obj in ipairs(workspace:GetChildren()) do
+            if targetNames[obj.Name] then
+                teleportObject(obj)
+            end
+        end
+    end
+})
+
+
+itemsSection:Button({
     Text = "Квест Такси",
     Callback = function()
         local Players = game:GetService("Players")
@@ -401,7 +445,6 @@ itemsSection:Button({
             Onion = true,
             Peper = true,
             banana = true
-
         }
 
         for _, obj in ipairs(workspace:GetChildren()) do
@@ -464,6 +507,9 @@ shopSection:Button({
     end
 })
 
+
+
+
 -- Новый таб "Авто-Фарм"
 local autoFarmTab = Window:Tab({
     Text = "Авто-Фарм"
@@ -492,6 +538,8 @@ local function updateRoadsCache()
     end
     table.sort(cachedRoads, function(a,b) return a.num < b.num end)
 end
+
+local lastTeleportedCFrame = nil -- переменная для хранения последнего CFrame
 
 loadingSection:Slider({
     Text = "Интервал (сек.)",
@@ -529,12 +577,39 @@ loadingSection:Toggle({
                     return
                 end
 
+                -- Если есть сохранённый последний CFrame — сразу телепортируемся туда
+                if lastTeleportedCFrame then
+                    hrp.CFrame = lastTeleportedCFrame + Vector3.new(0, 5, 0)
+                    print("Телепортирован на сохранённые координаты последней дороги")
+                else
+                    -- Телепорт на End как в исходном коде
+                    local endPart = workspace:FindFirstChild("RoadPrefabs") 
+                                    and workspace.RoadPrefabs:FindFirstChild("Canyon") 
+                                    and workspace.RoadPrefabs.Canyon:FindFirstChild("Road") 
+                                    and workspace.RoadPrefabs.Canyon.Road:FindFirstChild("End")
+                    if endPart and endPart:IsA("BasePart") then
+                        hrp.CFrame = endPart.CFrame + Vector3.new(0, 5, 0)
+                        print("Телепортирован к RoadPrefabs.Canyon.Road.End")
+                    end
+                end
+
                 local lastCacheUpdate = os.clock()
                 local lastMaxNumber = -math.huge
-                local teleportedToEnd = false
+
+                -- Если есть сохранённый maxNumber — начинаем с него
+                if lastTeleportedCFrame then
+                    -- Найдем номер последней дороги, к которой телепортировались
+                    for i, entry in ipairs(cachedRoads) do
+                        if entry.model.PrimaryPart and entry.model.PrimaryPart.CFrame.Position:FuzzyEq(lastTeleportedCFrame.Position, 0.1) then
+                            lastMaxNumber = entry.num
+                            break
+                        end
+                    end
+                end
+
+                local teleportedToEnd = lastTeleportedCFrame == nil
 
                 while autoLoadEnabled do
-                    -- Проверяем и телепортируем к End, если еще не телепортировались
                     if not teleportedToEnd then
                         local endPart = workspace:FindFirstChild("RoadPrefabs") 
                                         and workspace.RoadPrefabs:FindFirstChild("Canyon") 
@@ -544,11 +619,10 @@ loadingSection:Toggle({
                             hrp.CFrame = endPart.CFrame + Vector3.new(0, 5, 0)
                             print("Телепортирован к RoadPrefabs.Canyon.Road.End")
                             teleportedToEnd = true
-                            task.wait(1) -- пауза, чтобы игрок успел телепортироваться
+                            task.wait(1)
                         end
                     end
 
-                    -- Обновляем кеш каждые cacheUpdateInterval секунд
                     if os.clock() - lastCacheUpdate > cacheUpdateInterval then
                         updateRoadsCache()
                         lastCacheUpdate = os.clock()
@@ -569,8 +643,9 @@ loadingSection:Toggle({
 
                         if targetPart then
                             hrp.CFrame = targetPart.CFrame + Vector3.new(0, 5, 0)
-                            print("Телепортирован к дороге с номером: " .. tostring(maxEntry.num))
                             lastMaxNumber = maxEntry.num
+                            lastTeleportedCFrame = targetPart.CFrame -- сохраняем последний CFrame
+                            print("Телепортирован к дороге с номером: " .. tostring(maxEntry.num))
                         else
                             warn("В модели нет частей для телепортации")
                         end
@@ -583,6 +658,7 @@ loadingSection:Toggle({
             coroutine.resume(autoLoadThread)
         else
             autoLoadEnabled = false
+            print("Авто-Прогрузка отключена")
         end
     end
 })
