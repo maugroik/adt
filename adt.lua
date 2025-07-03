@@ -312,7 +312,25 @@ itemsSection:Button({
             Glassbottle = true,
             Barrel = true,
             Brick = true,
-            Heater = true
+            Heater = true,
+            Ball = true,
+            Basketball = true,
+            Cog = true,
+            Gear = true,
+            Iron = true,
+            back = true,
+            back2 = true,
+            frontbumper = true,
+            grill = true,
+            hood = true,
+            rearbumper = true,
+            IronBoard = true,
+            Lever = true,
+            DogTag = true,
+            Grate = true,
+            Landmine = true,
+            IronBeam = true
+
         }
 
         for _, obj in ipairs(workspace:GetChildren()) do
@@ -352,7 +370,8 @@ itemsSection:Button({
         local targetNames = {
           ["Gummy Gun"] = true,
           Pistol = true,
-          AK47 = true
+          AK47 = true,
+          Katana = true
         }
 
         for _, obj in ipairs(workspace:GetChildren()) do
