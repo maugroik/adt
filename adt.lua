@@ -320,7 +320,7 @@ itemsSection:Button({
 })
 
 itemsSection:Button({
-    Text = "Ценные вещи",
+    Text = "Квест Такси",
     Callback = function()
         local Players = game:GetService("Players")
         local LocalPlayer = Players.LocalPlayer
