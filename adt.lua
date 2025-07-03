@@ -265,7 +265,29 @@ itemsSection:Button({
             Shield = true,
             vaz = true,
             vaza = true,
-            toilet = true
+            toilet = true,
+            Cone = true,
+            Engine = true,
+            GasCan = true,
+            ["Silver Bar"] = true,
+            Wallet1 = true,
+            Wallet2 = true,
+            Wallet3 = true,
+            Wallet4 = true,
+            Wheel = true,
+            rightlight = true,
+            leftlight = true,
+            radiator = true,
+            oilcan = true,
+            SkateBoard = true,
+            LicensePlate1 = true,
+            LicensePlate2 = true,
+            LicensePlate3 = true,
+            LicensePlate4 = true,
+            Flashlight = true,
+            Glassbottle = true,
+            Barrel = true,
+            Brick = true
         }
 
         for _, obj in ipairs(workspace:GetChildren()) do
@@ -276,6 +298,53 @@ itemsSection:Button({
     end
 })
 
+itemsSection:Button({
+    Text = "Еда",
+    Callback = function()
+        local Players = game:GetService("Players")
+        local LocalPlayer = Players.LocalPlayer
+
+        local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+        local hrp = character:WaitForChild("HumanoidRootPart")
+
+        local offsetY = 0.5
+        local count = 0
+
+        local function teleportObject(obj)
+            local targetPart
+            if obj:IsA("Model") then
+                targetPart = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
+            elseif obj:IsA("BasePart") then
+                targetPart = obj
+            end
+
+            if targetPart then
+                targetPart.CFrame = hrp.CFrame * CFrame.new(0, offsetY * count, -5)
+                count = count + 1
+            end
+        end
+
+        local targetNames = {
+            Apple = true,
+            Bread = true,
+            Pizza = true,
+            Bar = true,
+            Burger = true,
+            Garlic = true,
+            Food = true,
+            Onion = true,
+            Peper = true,
+            banana = true
+
+        }
+
+        for _, obj in ipairs(workspace:GetChildren()) do
+            if targetNames[obj.Name] then
+                teleportObject(obj)
+            end
+        end
+    end
+})
 
 
 
