@@ -194,6 +194,27 @@ miscSection:Button({
     end
 })
 
+miscSection:Button({
+    Text = "Лобби",
+    Callback = function()
+        local TeleportService = game:GetService("TeleportService")
+        local PlaceId = 16389395869
+        local Player = game.Players.LocalPlayer
+
+        TeleportService:Teleport(PlaceId, Player)
+    end
+})
+
+miscSection:Button({
+    Text = "Пустыня",
+    Callback = function()
+        local TeleportService = game:GetService("TeleportService")
+        local PlaceId = 16389398622
+        local Player = game.Players.LocalPlayer
+
+        TeleportService:Teleport(PlaceId, Player)
+    end
+})
 
 itemsSection:Button({
     Text = "Крышечки",
@@ -288,6 +309,51 @@ itemsSection:Button({
             Glassbottle = true,
             Barrel = true,
             Brick = true
+        }
+
+        for _, obj in ipairs(workspace:GetChildren()) do
+            if targetNames[obj.Name] then
+                teleportObject(obj)
+            end
+        end
+    end
+})
+
+itemsSection:Button({
+    Text = "Ценные вещи",
+    Callback = function()
+        local Players = game:GetService("Players")
+        local LocalPlayer = Players.LocalPlayer
+
+        local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+        local hrp = character:WaitForChild("HumanoidRootPart")
+
+        local offsetY = 0.5
+        local count = 0
+
+        local function teleportObject(obj)
+            local targetPart
+            if obj:IsA("Model") then
+                targetPart = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
+            elseif obj:IsA("BasePart") then
+                targetPart = obj
+            end
+
+            if targetPart then
+                targetPart.CFrame = hrp.CFrame * CFrame.new(0, offsetY * count, -5)
+                count = count + 1
+            end
+        end
+
+        local targetNames = {
+            Wallet1 = true,
+            Wallet2 = true,
+            Wallet3 = true,
+            Wallet4 = true,
+            LicensePlate1 = true,
+            LicensePlate2 = true,
+            LicensePlate3 = true,
+            LicensePlate4 = true
         }
 
         for _, obj in ipairs(workspace:GetChildren()) do
