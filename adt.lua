@@ -396,8 +396,23 @@ loadingSection:Toggle({
 
                 local lastCacheUpdate = os.clock()
                 local lastMaxNumber = -math.huge
+                local teleportedToEnd = false
 
                 while autoLoadEnabled do
+                    -- Проверяем и телепортируем к End, если еще не телепортировались
+                    if not teleportedToEnd then
+                        local endPart = workspace:FindFirstChild("RoadPrefabs") 
+                                        and workspace.RoadPrefabs:FindFirstChild("Canyon") 
+                                        and workspace.RoadPrefabs.Canyon:FindFirstChild("Road") 
+                                        and workspace.RoadPrefabs.Canyon.Road:FindFirstChild("End")
+                        if endPart and endPart:IsA("BasePart") then
+                            hrp.CFrame = endPart.CFrame + Vector3.new(0, 5, 0)
+                            print("Телепортирован к RoadPrefabs.Canyon.Road.End")
+                            teleportedToEnd = true
+                            task.wait(1) -- пауза, чтобы игрок успел телепортироваться
+                        end
+                    end
+
                     -- Обновляем кеш каждые cacheUpdateInterval секунд
                     if os.clock() - lastCacheUpdate > cacheUpdateInterval then
                         updateRoadsCache()
@@ -419,7 +434,7 @@ loadingSection:Toggle({
 
                         if targetPart then
                             hrp.CFrame = targetPart.CFrame + Vector3.new(0, 5, 0)
-                            print("Телепортирован к дороге с номером: ".. tostring(maxEntry.num))
+                            print("Телепортирован к дороге с номером: " .. tostring(maxEntry.num))
                             lastMaxNumber = maxEntry.num
                         else
                             warn("В модели нет частей для телепортации")
